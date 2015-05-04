@@ -30,7 +30,7 @@
 #define MAXTOKS 100
 
 typedef char *tok_t;
-
+tok_t *getPipes(char *line);
 tok_t *getToks(char *line);
 void freeToks(tok_t *toks);
 

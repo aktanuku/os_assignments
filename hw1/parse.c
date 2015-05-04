@@ -11,6 +11,7 @@
 /* Storage: Resulting token array points into original line */
 
 #define TOKseparator " \n:"
+#define PIPEseparator "|"
 
 tok_t *getToks(char *line) {
   int i;
@@ -27,6 +28,23 @@ tok_t *getToks(char *line) {
   }
   return toks;
 }
+
+tok_t *getPipes(char *line) {
+  int i;
+  char *c;
+
+  tok_t *toks = malloc(MAXTOKS*sizeof(tok_t));
+  for (i=0; i<MAXTOKS; i++) toks[i] = NULL;     /* empty token array */
+  
+
+  c = strtok(line,TOKseparator);	 /* Start tokenizer on line */
+  for (i=0; c && (i < MAXTOKS); i++) {
+    toks[i] = c;
+    c = strtok(NULL,PIPEseparator);	/* scan for next token */
+  }
+  return toks;
+}
+
 
 void freeToks(tok_t *toks) {
   free(toks);
