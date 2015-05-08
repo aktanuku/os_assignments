@@ -123,7 +123,7 @@ void init_shell()
   signal(SIGTSTP, SIG_IGN);
   signal(SIGTTIN, SIG_IGN);
   signal(SIGTTOU, SIG_IGN);
-  signal(SIGCHLD, SIG_IGN); 
+//  signal(SIGCHLD, SIG_IGN); 
   
 }
 
@@ -157,10 +157,12 @@ char* resolve_path(char* inputString){
 		}
 		i=i+1;
 	}
-	if(fopen(inputString,"r"))
+	if(f=fopen(inputString,"r")){
+		fclose(f);	
 		return inputString;
+	}
 	else
-		return "This file doesn't exist\n";
+		return inputString;
 }
 		 
 
@@ -180,7 +182,6 @@ void add_process(process* p)
 
 	q = first_process;
 	while(q->next != NULL){
-		printf("%s\n", q->argv[0]);
 		q = q->next;  
 	}
 //	q->next = malloc(sizeof(process));
@@ -191,7 +192,6 @@ void add_process(process* p)
 	q = first_process;
 
 	while(q != NULL){
-		printf("%s\n", q->argv[0]);
 		q = q->next;
 	}
 
@@ -214,7 +214,8 @@ void init_process_list(){
    	(*first_process).background = 0;
 	(*first_process).next = malloc(sizeof(process));
  	(*first_process).next = NULL;
-   	(*first_process).prev = NULL;    
+   	(*first_process).prev = NULL;
+	(*first_process).pid = -1;    
 
 }
 
@@ -241,7 +242,15 @@ process* create_process(char* inputString)
  	char local_s[1000];
   
 	strcpy(local_s, inputString); 
-  
+
+	if( *(local_s+strlen(local_s)-2) == '&'){
+		(*p).background = 1;
+		*(local_s+strlen(local_s)-2) = 0x20;
+	}
+	else{
+		(*p).background = 0;
+	}
+	  
   	ptr = strstr(local_s, "2>");
   	i=2;
 	if(ptr){
@@ -306,9 +315,10 @@ process* create_process(char* inputString)
    }  
    (*p).argv[arg_count] = NULL;
    (*p).argc = arg_count;
+   (*p).pid = 0;
    (*p).completed = 0;
    (*p).stopped = 0;
-   (*p).background = 0;
+  // (*p).background = 0;
    (*p).next = NULL;
    (*p).prev = NULL;    
 
@@ -325,8 +335,23 @@ void destroy_process(process* p){
 	free(p);
 }
 
+void purge_proc_list(){
 
+	process *p;
+	process *p_prev;
+	process *p_next;
+	for (p = first_process; p; p=p->next){
+		if (p->completed){
+			p_prev = p->prev;
+			p_next = p->next;
 
+			p_prev->next = p_next;
+			if(p_next)
+				p_next->prev = p_prev;
+			destroy_process(p);
+		}
+	}
+}			
 
 int shell (int argc, char *argv[]) {
   char *s = malloc(INPUT_STRING_SIZE+1);			/* user input string */
@@ -344,23 +369,72 @@ int shell (int argc, char *argv[]) {
   int pipe_num = 0;
   printf("%s running as PID %d under %d\n",argv[0],pid,ppid);
   process *p;
+  process *next_p;
   lineNum=0;
   fprintf(stdout, "%d: ", lineNum);
   while ((s = freadln(stdin))){
 	
     p = create_process(s);
     add_process(p);	
-    t = getToks(s); /* break the line into tokens */
- 
-    fundex = lookup(t[0]); /* Is first token a shell literal */
-
     
-    if(fundex >= 0) cmd_table[fundex].fun(&t[1]);
-    else {
-     	  launch_process(p);
-	 }
+   process* q;
+   q = first_process;
+
+   shell_is_interactive = isatty(shell_terminal);
+   if(shell_is_interactive){ 
+
+	next_p = first_process;
+
+	
+	while((next_p->next != NULL)){
+		
+		if(next_p->pid == 0 ){
+			break;	
+		}
+		else
+			next_p = next_p->next;
+	}
+
+
+
+	if(next_p != NULL){
+		fundex = lookup(next_p->argv[0]); /* Is first token a shell literal */
+
+		if(fundex >= 0) 
+			cmd_table[fundex].fun(&(next_p->argv[1]));
+		else {
+		  launch_process(p);
+		 }
+	}
+
+	process *pi;
+	
+	for (pi = first_process; pi; pi = pi->next){
+		if(pi->stopped == 1){
+			if(pi->background == 1)
+				printf("bg pid: %d stopped\n", pi->pid);
+			else
+				printf("fg pid: %d stopped\n", pi->pid);
+
+		}
+		if(pi->completed == 1){
+			if(pi->background == 1)
+				printf("bg pid: %d completed\n", pi->pid);
+			else{}		
+			//	printf("fg pid: %d completed\n", pi->pid);
+		}
+	}
+
+
+	purge_proc_list();
+	
+
     getcwd(cwd,1000);
     fprintf(stdout, "%s %d: ", cwd, lineNum); 
+
+   }
+
+
   }
   return 0;
 }
