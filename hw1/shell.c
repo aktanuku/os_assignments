@@ -50,6 +50,13 @@ int cmd_help(tok_t arg[]);
 
 int cmd_cd(tok_t arg[]);
 
+int cmd_plist(tok_t arg[]);
+
+int cmd_fg(tok_t arg[]);
+
+int cmd_bg(tok_t arg[]);
+
+int cmd_wait(tok_t arg[]);
 
 
 /* Command Lookup table */
@@ -64,6 +71,10 @@ fun_desc_t cmd_table[] = {
   {cmd_help, "?", "show this help menu"},
   {cmd_quit, "quit", "quit the command shell"},
   {cmd_cd, "cd", "change directory"},
+  {cmd_plist, "plist", "list processes"},
+  {cmd_fg, "fg", "put process in foreground"},
+  {cmd_bg, "bg", "put process in background"},
+  {cmd_wait, "wait", "wait for all background processes to complete"}
 };
 
 int cmd_help(tok_t arg[]) {
@@ -73,7 +84,119 @@ int cmd_help(tok_t arg[]) {
   }
   return 1;
 }
+int cmd_plist(tok_t arg[]){
+	process *p;
+	for (p = first_process; p; p=p->next){
+		printf("pid %d, background %d\n", p->pid, p->background);
+	}
+	return 0;
+}
+int cmd_bg(tok_t arg[]){
+	long pid = 0;
+	process *p;
+	if(arg[0]){
+		pid = strtol(arg[0], NULL, 10);
+		for(p = first_process; p ; p = p->next){
+			if(p->pid == pid){
+				put_process_in_background(p,1);
+				return 0;
+			}
+		}
+		return -1;
+	}
+	else{
+		for(p = first_process; p->next; p = p->next){
+		
+		}
+		p = p->prev;
+		if(p != first_process){
+			put_process_in_background(p,1);
+			return 0;	
+		}
+		else{
+			return -1;
+		}
+	}
 
+}
+int cmd_wait(tok_t arg[]){
+	int status;
+	pid_t pid;
+	int n_proc = num_active_proc();
+
+	while(n_proc > 0){
+		pid = waitpid(-1, &status, WUNTRACED);
+		mark_process_status(pid,status);
+		n_proc = num_active_proc();
+		}
+	
+	return 0;
+}
+
+
+int num_active_proc(){
+
+	process *p;
+	int num_active = 0;
+	for(p = first_process; p; p = p->next){
+		if(p == first_process)
+			continue;
+		else if(p->stopped == 1)
+			continue;
+		else if(p->completed == 1)
+			continue;
+		else if(!strcmp("wait", p->argv[0]))
+			continue;
+		else
+			num_active = num_active + 1;	
+	}
+
+	return num_active;
+}
+
+int cmd_fg(tok_t arg[]){
+	long pid = 0;
+	process *p;
+	if(arg[0]){
+		pid = strtol(arg[0], NULL, 10);
+		for(p = first_process; p; p = p->next){
+			if(p->pid == pid){
+				if(p->stopped){
+					put_process_in_foreground(p, 1);
+					return 0;
+				}
+				else{
+					put_process_in_foreground(p, 0);
+					return 0;
+					
+				}
+			}
+		}
+		return -1;
+		
+	}
+	else{
+		for(p = first_process; p->next; p = p->next){
+		
+		}
+		p = p->prev; 
+		if(p != first_process){
+			if(p->stopped){
+				put_process_in_foreground(p,1);
+				return 0;
+			}
+			else{
+				put_process_in_foreground(p,0);
+				return 0;
+			}
+		}
+		else{
+			return -1;
+		}
+		
+	}
+}
+	
 int cmd_cd(tok_t arg[]) {
  //printf("%s\n", arg[0]);
  if (arg[0])
@@ -299,14 +422,20 @@ process* create_process(char* inputString)
 	}
 
   tok_t *t = getToks(local_s);
+  
   int arg_count =0;
    i=0;
   while(t[arg_count] != NULL)
 	arg_count = arg_count + 1;
       (*p).argv = (char**)malloc(sizeof(char*)*(arg_count+1)) ;
      //resolve path for first arguement
+    if((t[0] == NULL)){
+      	(*p).argv[0] = NULL;
+        }
+    else{
    (*p).argv[0] = (char*)malloc(sizeof(char)*strlen(resolve_path(t[0])));
-   strcpy((*p).argv[0],resolve_path(t[0]));
+    strcpy((*p).argv[0],resolve_path(t[0]));
+   }
   //copy over rest of arguments
    for(i=1; i<arg_count; i++){
 
@@ -373,7 +502,8 @@ int shell (int argc, char *argv[]) {
   lineNum=0;
   fprintf(stdout, "%d: ", lineNum);
   while ((s = freadln(stdin))){
-	
+    process *pi;
+
     p = create_process(s);
     add_process(p);	
     
@@ -385,7 +515,6 @@ int shell (int argc, char *argv[]) {
 
 	next_p = first_process;
 
-	
 	while((next_p->next != NULL)){
 		
 		if(next_p->pid == 0 ){
@@ -395,19 +524,22 @@ int shell (int argc, char *argv[]) {
 			next_p = next_p->next;
 	}
 
-
+	
 
 	if(next_p != NULL){
 		fundex = lookup(next_p->argv[0]); /* Is first token a shell literal */
-
-		if(fundex >= 0) 
+		if(fundex >= 0){ 
 			cmd_table[fundex].fun(&(next_p->argv[1]));
+			next_p->completed = 1;
+		}
+		else if( next_p->argv[0] == NULL){
+			next_p->completed = 1;
+		}
 		else {
 		  launch_process(p);
 		 }
 	}
 
-	process *pi;
 	
 	for (pi = first_process; pi; pi = pi->next){
 		if(pi->stopped == 1){

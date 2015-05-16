@@ -89,13 +89,14 @@ void launch_process(process *p)
 
 int mark_process_status(pid_t pid, int status){
 	process *p;
-	
 	if(pid>0){
 		for(p = first_process; p; p = p->next){
 			if(p->pid == pid){
 				p->status = status;
-				if(WIFSTOPPED(status))
+				if(WIFSTOPPED(status)){
 					p->stopped = 1;
+					return 0;
+				}
 				else
 					{
 					p->completed = 1;
@@ -103,6 +104,7 @@ int mark_process_status(pid_t pid, int status){
 					fprintf(stderr, "%d: Terminated by signal %d.\n",
 						(int) pid, WTERMSIG(p->status));
 					}
+	
 				return 0;
 				}
 			}
@@ -119,6 +121,7 @@ int mark_process_status(pid_t pid, int status){
 }
 
 void wait_for_process(process *p){
+
 	int status;
 	pid_t pid;
 
@@ -135,7 +138,10 @@ void wait_for_process(process *p){
 			printf("error einval\n");
 			}
 	}	
-	}while(!mark_process_status(pid,status) && !WIFEXITED((*p).status) && !WIFSIGNALED((*p).status) && !WIFSTOPPED((*p).status));
+	
+
+	}while(!mark_process_status(pid,status) && !(p->completed) && !(p->stopped));
+	
 }
 
 
@@ -146,7 +152,6 @@ void wait_for_process(process *p){
 void
 put_process_in_foreground (process *p, int cont)
 {
-
   pid_t wpid;
 
   /* give process control of terminal */
@@ -159,11 +164,18 @@ put_process_in_foreground (process *p, int cont)
 	tcsetattr(shell_terminal, TCSADRAIN, &p->tmodes);
 	if(kill(- p->pid, SIGCONT) < 0)
 		perror("kill (SIGCOUNT)");
+	if(p->stopped == 1){
+		p->stopped = 0;
+	}
+
     }
-
-
+	if(p->background == 1){
+		p->background = 0;
+	}
+	
 	/* wait for child process to be signaled, stopped of completed*/
 	wait_for_process(p);
+	
 	/*give terminal control back to shell */
 	tcsetpgrp(shell_terminal, shell_pgid);
 	tcgetattr(shell_terminal, &p->tmodes);
@@ -178,8 +190,16 @@ put_process_in_foreground (process *p, int cont)
 void
 put_process_in_background (process *p, int cont)
 {
-  if(cont)
+  if(cont){
 	if(kill(-p->pid, SIGCONT) < 0)
 		perror("kill (SIGCONT)");
+	
+	if(p->stopped == 1){
+		p->stopped = 0;
+	}
+  }
+	if(p->background == 0){
+		p->background = 1;
+	}
 
 }
