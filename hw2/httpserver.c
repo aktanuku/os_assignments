@@ -158,11 +158,11 @@ int proxy_request(int fd, int fd_send){
  
  char *read_buffer = malloc(LIBHTTP_REQUEST_MAX_SIZE + 1);
   if (!read_buffer) http_fatal_error("Malloc failed");
-
+  
   int bytes_read = read(fd, read_buffer, LIBHTTP_REQUEST_MAX_SIZE);
- 
+ // fwrite(read_buffer, bytes_read, 1, stdout);
   int bytes_sent = write(fd_send, read_buffer, bytes_read);
-
+  printf("bytes read: %d\n", bytes_read);
   
 
   if(bytes_read == bytes_sent)
@@ -239,62 +239,67 @@ void handle_proxy_request(int fd)
   //get max file descriptor for select call
   int maxfd = (fd> *socket_number_proxy ? fd : *socket_number_proxy);
 
-  //initalize read and write sets to pass to select call and clear them 
+  //initalize read set to pass to select call and clear them 
   fd_set readset;
-  fd_set writeset;
   FD_ZERO(&readset);
-  FD_ZERO(&writeset);
+  
 
-  //add the client file descriptors to read and write sets for select
+  //add the client file descriptors to read  set for select
   FD_SET(fd, &readset);
-  FD_SET(fd, &writeset);
+  
 
   //do same for remote server file descriptor
   FD_SET(*socket_number_proxy, &readset);
-  FD_SET(*socket_number_proxy, &writeset);
+  
 
   
   //temporary sets for polling i guess
   fd_set readtemp;
-  fd_set writetemp;
+  
 
   int result;
 
   printf("max fd %d\n", maxfd);
   int socketsopen = 1;
   int bytes_sent = 0;
-  while(socketsopen){
+  struct timeval tv;
+
+    while(socketsopen){
 //	printf("inside outer while loop\n");
         memcpy(&readtemp, &readset, sizeof(readtemp));
-        memcpy(&writetemp, &writeset, sizeof(writetemp));
+  	tv.tv_sec = 30;
+  	tv.tv_usec = 0;
+    
 
-  	result = select(maxfd + 1, &readtemp, NULL, NULL, NULL);
+  	result = select(maxfd + 1, &readtemp, NULL, NULL, &tv);
 	
 		
 	if(result == -1){
-		printf("something bad happened\n");
+		printf("select timed out?\n");
 	}
 	else{
-		printf("whats up doc?\n");
+		//printf("whats up doc?\n");
 		if(FD_ISSET(fd, &readtemp)){
-			printf("case 1\n");
+			printf("client to remote\n");
 			bytes_sent = proxy_request(fd, *socket_number_proxy);
-		//	proxy_request(*socket_number_proxy, fd);
 
 		}
 		else if(FD_ISSET(*socket_number_proxy, &readtemp)){
-			printf("case 2\n");
+			printf("remote to client\n");
 			bytes_sent = proxy_request(*socket_number_proxy, fd);
-		//	proxy_request(fd, *socket_number_proxy);
 		}
 	}
 	if (bytes_sent < 0){
 		socketsopen = 0;
 	}
-	
 
   }
-		
+	fprintf(stdout, "someone hung up, exiting...\n");
+	if ((close(fd) < 0)||(close(*socket_number_proxy) < 0)){
+		 fprintf(stdout, "Failed to close all sockets (ignoring)\n");
+	}
+  	exit(1);
+	
 		
 
 }
