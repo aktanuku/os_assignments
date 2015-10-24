@@ -9,8 +9,12 @@
 #ifndef _malloc_H_
 #define _malloc_H_
 
+
  /* Define the block size since the sizeof will be wrong */
 #define BLOCK_SIZE 40
+#ifdef __cplusplus
+int alabama;
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -22,6 +26,11 @@ void* mm_malloc(size_t size);
 void* mm_realloc(void* ptr, size_t size);
 void mm_free(void* ptr);
 
+
+/*some printing methods for testing*/
+void print_the_fuckin_heap(int bytes);
+void print_blockmeta_by_address(void *p);
+void print_all_meta();
 
 typedef struct s_block *s_block_ptr;
 
@@ -35,6 +44,8 @@ struct s_block {
     /* A pointer to the allocated block */
     char data [0];
  };
+//s_block_ptr block_list_head;
+
 
 /* Split block according to size, b must exist */
 void split_block (s_block_ptr b, size_t s);
@@ -50,9 +61,10 @@ s_block_ptr get_block (void *p);
  */
 s_block_ptr extend_heap (s_block_ptr last , size_t s);
 
+int does_block_exist(s_block_ptr b);
 
+/* update block metadata */
 #ifdef __cplusplus
 }
 #endif
-
 #endif
