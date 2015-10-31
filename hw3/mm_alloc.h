@@ -31,7 +31,7 @@ void mm_free(void* ptr);
 void print_the_fuckin_heap(int bytes);
 void print_blockmeta_by_address(void *p);
 void print_all_meta();
-
+void find_max_block();
 typedef struct s_block *s_block_ptr;
 
 /* block struct */

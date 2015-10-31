@@ -1,4 +1,4 @@
-SRCS=mm_alloc.c mm_test.c
+SRCS=mm_alloc.c test.c 
 EXECUTABLES=malloc_test
 
 CC=gcc

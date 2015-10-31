@@ -20,6 +20,22 @@ void print_the_fuckin_heap(int bytes){
 	}
 
 }
+void find_max_block(){
+	size_t maxsz = 0;
+	int maxi = 0;
+	int i = 0;
+	s_block_ptr iter;
+
+	for(iter = block_list_head; iter != NULL; iter = iter->next){
+		if(iter->size > maxsz){
+			maxsz = iter->size;
+			maxi = i;
+		}
+		i = i + 1;		
+	}
+	printf("max :%d, number %d\n", maxsz, i);
+
+}
 void print_blockmeta_by_address(void *p){
 
 	s_block_ptr sbp = get_block(p);
@@ -44,7 +60,6 @@ void print_all_meta(){
 
 void* mm_malloc(size_t size)
 {
-	
 	void * return_ptr;
 	s_block_ptr sp;
 	s_block_ptr iter;
@@ -61,13 +76,16 @@ void* mm_malloc(size_t size)
 	}
 	else{
 		last_block = block_list_head;
-		for(iter = block_list_head; iter->next != NULL; iter = iter->next){
+		int i = 0;
+		for(iter = block_list_head; iter != NULL; iter = iter->next){
+			i = i + 1;
+			
 			last_block = iter;
 			if(iter->free != 1){
 				continue;
 			}
 			else{
-				if(iter->size > size){
+				if(iter->size > size + BLOCK_SIZE){
 					found = 1;
 					split_block(iter, size);
 					iter->next->free = 1;
@@ -76,7 +94,7 @@ void* mm_malloc(size_t size)
 					break;
 
 				}
-				else if(iter->size == size){
+				else if(iter->size == size + BLOCK_SIZE){
 					found = 1;
 					iter->free = 0;
 					return_ptr = iter->data;
@@ -85,9 +103,10 @@ void* mm_malloc(size_t size)
 				
 			}
 		}
+		
 		if(found != 1){
-				
-			sp = extend_heap(iter, size);
+			
+			sp = extend_heap(last_block, size);
 			return_ptr = sp->data;
 		
 
@@ -116,7 +135,7 @@ void split_block (s_block_ptr b, size_t s){
 	third_block = b->next;
 
 	/*fix next  block*/
-	sb.size = b->size - s;	
+	sb.size = b->size - s - BLOCK_SIZE;	
 	sb.next =(s_block_ptr)b->next;
 	sb.prev = (s_block_ptr)b->ptr;
 	sb.free = 1;
@@ -127,13 +146,15 @@ void split_block (s_block_ptr b, size_t s){
 	b->next = sb.ptr;
 	
 	/*fix last block */
-	third_block->prev = sb.ptr;
+	if(third_block)
+		third_block->prev = sb.ptr;
 
 	/*copy new block meta into memory*/
 	memcpy(sb.ptr, &sb, BLOCK_SIZE);
 
 	/*set everything to 0*/
 	s_block_ptr new_ptr = (s_block_ptr) sb.ptr;
+
 	memset(new_ptr->data, 0x00, new_ptr->size);
 	memset(b->data, 0x00, b->size);
 }
@@ -178,10 +199,9 @@ s_block_ptr extend_heap(s_block_ptr last, size_t s){
 	/*set pointer to block which will be exactly where sbrk returned earlier*/
 	sb.ptr = p;
 	memcpy(p, &sb, BLOCK_SIZE);
-
+	
 	/*set everything to 0*/
 	memset(((s_block_ptr)p)->data, 0x00, s);
-
 
 	return (s_block_ptr) p;
 
@@ -273,6 +293,7 @@ void mm_free(void* ptr)
     s_block_ptr sbp;
     s_block_ptr new_ptr;
     sbp = get_block(ptr);
+
     int found = 0;	
     s_block_ptr iter;
 
@@ -285,12 +306,16 @@ void mm_free(void* ptr)
 
     if(found != 1){
 	printf("Tried to free a pointer you don't own! Exiting. \n");
+			
+   	print_all_meta(); 
 	exit(1);
 
     }
 
     if(sbp-> free == 1){
-	printf("Tried to free a pointer you don't own! Exiting. \n");
+	printf("Tried to free a pointer you don't own but its in my list! Exiting. \n");
+	printf("%02X\n", ptr);
+
 	exit(1);
     }
 
