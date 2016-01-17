@@ -370,7 +370,8 @@ static int kvfs_unlink(const char* pathname){
 		kvfs->size = kvfs->size - 1;
 
 		kvfs = realloc(kvfs, sizeof(kvfs_t) + sizeof(fnode_t) * (kvfs->size));
-		
+		clear_superblock();
+		write_superblock();
 		return 0;
 
 	}
@@ -389,7 +390,8 @@ static int kvfs_rename(const char* name, const char* newname){
 
 		memset((void*) kvfs->data[index].name, 0, NAME_SIZE);
 		strcpy(kvfs->data[index].name, newname);
-	
+		clear_superblock();
+		write_superblock();	
 		return 0;
 
 	}
