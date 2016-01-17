@@ -3,7 +3,10 @@
 
 #define FUSE_USE_VERSION 26L
 #define PATH_MAX 1024
+#define NAME_SIZE 1024
+#define DATA_SIZE 1024
 #define SUPERBLOCK_SIZE 10*4096*2048 + 1
+#define NUM_FILES 10*4096
 #define FNODE_MAGIC   0xDEADBEEF
 
 #include <fuse.h>
@@ -35,8 +38,8 @@
 char* mountparent;
 
 typedef struct fnode {
-    char name[1024];
-    char data[1024];
+    char name[NAME_SIZE];
+    char data[DATA_SIZE];
     uint32_t magic;
 } fnode_t;
 
